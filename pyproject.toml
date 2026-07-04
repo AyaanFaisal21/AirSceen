@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airscreen"
+version = "0.1.0"
+description = "Experimental hand and gaze based desktop control."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Ayaan Faisal" }
+]
+dependencies = [
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+vision = [
+  "opencv-python>=4.9",
+  "mediapipe>=0.10",
+  "pyautogui>=0.9",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+airscreen = "airscreen.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["airscreen"]

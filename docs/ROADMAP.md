@@ -1,0 +1,44 @@
+# Roadmap
+
+## Phase 0: Scaffold
+
+- Python package and CLI.
+- Runtime configuration object.
+- Interfaces for camera, hand tracking, gaze tracking, and pointer control.
+- Deterministic pinch click detector with tests.
+- Project map and implementation roadmap.
+
+## Phase 1: Hand Tracking Prototype
+
+- Add OpenCV camera frame source.
+- Add MediaPipe hand tracker adapter.
+- Add debug preview with landmark overlay.
+- Record short landmark sessions for testing and calibration.
+
+## Phase 2: Pointer Movement
+
+- Map normalized fingertip coordinates to screen coordinates.
+- Add smoothing and low-confidence suppression.
+- Add visible enable/disable state.
+- Add real pointer adapter behind an explicit `--enable-pointer` flag.
+
+## Phase 3: Click Gesture
+
+- Tune pinch thresholds from recorded samples.
+- Add drag-ready state machine for press, hold, release.
+- Add per-user gesture calibration.
+- Add false-positive tests with non-click motion samples.
+
+## Phase 4: Gaze Assist
+
+- Add MediaPipe face mesh based gaze estimation.
+- Calibrate gaze to the screen with guided points.
+- Combine gaze and hand input for target disambiguation.
+- Keep gaze optional until accuracy is useful.
+
+## Phase 5: Learned Gestures
+
+- Define capture format for labeled gesture samples.
+- Train a lightweight classifier for click and hold gestures.
+- Version model metadata and evaluation reports.
+- Fall back to geometry-based pinch detection when model confidence is low.
