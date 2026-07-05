@@ -11,7 +11,7 @@
 ## Phase 1: Hand Tracking Prototype
 
 - [x] Add OpenCV camera frame source.
-- [ ] Add MediaPipe hand tracker adapter.
+- [x] Add MediaPipe hand tracker adapter.
 - [ ] Add debug preview with landmark overlay.
 - [ ] Record short landmark sessions for testing and calibration.
 
