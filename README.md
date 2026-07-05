@@ -37,6 +37,17 @@ airscreen --dry-run
 
 The dry-run mode does not access the webcam or move the pointer yet. It verifies that the package and CLI wiring are installed correctly.
 
+## Camera Debug Preview
+
+Install the vision extras, then run the temporary debug preview:
+
+```bash
+python -m pip install -e ".[vision,dev]"
+airscreen --debug-preview
+```
+
+The preview opens the selected camera, draws boxes and labels around detected fingertips, and shows a pinch-state indicator. Press `q` or Escape to quit. On macOS, the terminal or app running AirScreen may need Camera permission before frames appear.
+
 ## Planned Runtime Stack
 
 - Python 3.11+

@@ -22,10 +22,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         help="Camera index passed to the frame source.",
     )
+    parser.add_argument(
+        "--debug-preview",
+        action="store_true",
+        help="Open a camera preview with fingertip overlays and pinch gesture state.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    config = AirScreenConfig(camera_index=args.camera_index, dry_run=args.dry_run)
+    config = AirScreenConfig(
+        camera_index=args.camera_index,
+        dry_run=args.dry_run,
+        debug_preview=args.debug_preview,
+    )
     return AirScreenApp(config).run()

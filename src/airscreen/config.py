@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class AirScreenConfig:
     camera_index: int = 0
     dry_run: bool = False
+    debug_preview: bool = False
     pinch_click_threshold: float = 0.055
     pinch_release_threshold: float = 0.075
     pointer_smoothing: float = 0.35
