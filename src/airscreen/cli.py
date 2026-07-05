@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Open a camera preview with fingertip overlays and pinch gesture state.",
     )
+    parser.add_argument(
+        "--enable-gaze",
+        action="store_true",
+        help="Add approximate gaze tracking to the debug preview.",
+    )
     return parser
 
 
@@ -36,5 +41,6 @@ def main(argv: list[str] | None = None) -> int:
         camera_index=args.camera_index,
         dry_run=args.dry_run,
         debug_preview=args.debug_preview,
+        gaze_enabled=args.enable_gaze,
     )
     return AirScreenApp(config).run()

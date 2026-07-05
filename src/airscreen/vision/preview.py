@@ -8,6 +8,7 @@ from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchClickDetector, PinchState
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource
+from airscreen.vision.gaze_tracker import GazeEstimate, GazeTracker, MediaPipeGazeTracker
 from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
 
 
@@ -93,12 +94,16 @@ class FingerOverlayRenderer:
         frame: Frame,
         hands: Sequence[HandLandmarks],
         pinch_state: PinchState | None,
+        gaze_estimate: GazeEstimate | None = None,
     ) -> object:
         cv2 = self._load_cv2()
         image = frame.data
 
         for hand in hands:
             self._draw_hand(cv2, image, frame, hand)
+
+        if gaze_estimate is not None:
+            self._draw_gaze_estimate(cv2, image, frame, gaze_estimate)
 
         self._draw_pinch_state(cv2, image, pinch_state)
         return image
@@ -166,6 +171,31 @@ class FingerOverlayRenderer:
             cv2.LINE_AA,
         )
 
+    def _draw_gaze_estimate(
+        self,
+        cv2: PreviewCv2Like,
+        image: object,
+        frame: Frame,
+        gaze_estimate: GazeEstimate,
+    ) -> None:
+        center = self._to_pixel(frame, Landmark(gaze_estimate.x, gaze_estimate.y))
+        x, y = center
+        color = (255, 80, 80)
+
+        cv2.circle(image, center, 10, color, 2)
+        cv2.line(image, (x - 18, y), (x + 18, y), color, 2)
+        cv2.line(image, (x, y - 18), (x, y + 18), color, 2)
+        cv2.putText(
+            image,
+            f"GAZE {gaze_estimate.confidence:.2f}",
+            (x + 16, y - 16),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
+
     def _finger_markers(self, hand: HandLandmarks) -> Sequence[FingerMarker]:
         markers = [
             FingerMarker("THUMB", hand.thumb_tip, (0, 128, 255)),
@@ -213,12 +243,14 @@ class DebugPreviewRunner:
         config: AirScreenConfig,
         frame_source: FrameSource | None = None,
         hand_tracker: HandTracker | None = None,
+        gaze_tracker: GazeTracker | None = None,
         renderer: FingerOverlayRenderer | None = None,
         cv2_module: PreviewCv2Like | None = None,
     ) -> None:
         self._config = config
         self._frame_source = frame_source
         self._hand_tracker = hand_tracker
+        self._gaze_tracker = gaze_tracker
         self._renderer = renderer
         self._cv2_module = cv2_module
 
@@ -229,6 +261,7 @@ class DebugPreviewRunner:
             cv2_module=cv2,
         )
         hand_tracker = self._hand_tracker or MediaPipeHandTracker(cv2_module=cv2)
+        gaze_tracker = self._load_gaze_tracker(cv2)
         renderer = self._renderer or FingerOverlayRenderer(cv2_module=cv2)
         pinch_detector = PinchClickDetector(
             click_threshold=self._config.pinch_click_threshold,
@@ -238,8 +271,9 @@ class DebugPreviewRunner:
         try:
             for frame in frame_source.frames():
                 hands = hand_tracker.track(frame)
+                gaze_estimate = gaze_tracker.estimate(frame) if gaze_tracker is not None else None
                 pinch_state = pinch_detector.update(hands[0]) if hands else None
-                image = renderer.render(frame, hands, pinch_state)
+                image = renderer.render(frame, hands, pinch_state, gaze_estimate)
                 cv2.imshow(self.WINDOW_NAME, image)
 
                 key = cv2.waitKey(1) & 0xFF
@@ -249,9 +283,18 @@ class DebugPreviewRunner:
             close = getattr(hand_tracker, "close", None)
             if callable(close):
                 close()
+            close = getattr(gaze_tracker, "close", None)
+            if callable(close):
+                close()
             cv2.destroyAllWindows()
 
         return 0
+
+    def _load_gaze_tracker(self, cv2: PreviewCv2Like) -> GazeTracker | None:
+        if not self._config.gaze_enabled:
+            return None
+
+        return self._gaze_tracker or MediaPipeGazeTracker(cv2_module=cv2)
 
     def _load_cv2(self) -> PreviewCv2Like:
         if self._cv2_module is not None:

@@ -6,6 +6,7 @@ from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchState
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame
+from airscreen.vision.gaze_tracker import GazeEstimate
 from airscreen.vision.preview import DebugPreviewRunner, FingerOverlayRenderer
 
 
@@ -105,6 +106,18 @@ class FakeHandTracker:
         self.closed = True
 
 
+class FakeGazeTracker:
+    def __init__(self, estimate: GazeEstimate | None) -> None:
+        self.estimate_result = estimate
+        self.closed = False
+
+    def estimate(self, frame: Frame) -> GazeEstimate | None:
+        return self.estimate_result
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def sample_hand() -> HandLandmarks:
     return HandLandmarks(
         wrist=Landmark(0.1, 0.1),
@@ -138,6 +151,23 @@ def test_finger_overlay_draws_fingertip_boxes_and_pinch_indicator() -> None:
     assert cv2.rectangles[-1][3] == (0, 220, 0)
 
 
+def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    renderer = FingerOverlayRenderer(cv2_module=cv2)
+
+    renderer.render(
+        frame,
+        [],
+        None,
+        GazeEstimate(x=0.25, y=0.75, confidence=0.5),
+    )
+
+    assert cv2.circles[0][1] == (25, 150)
+    assert "GAZE 0.50" in cv2.text
+
+
 def test_debug_preview_runner_shows_frame_and_closes_resources() -> None:
     cv2 = FakeCv2()
     image = object()
@@ -158,3 +188,26 @@ def test_debug_preview_runner_shows_frame_and_closes_resources() -> None:
     assert cv2.shown_images == [image]
     assert cv2.destroyed is True
     assert hand_tracker.closed is True
+
+
+def test_debug_preview_runner_uses_gaze_tracker_when_enabled() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame_source = FakeFrameSource([Frame(width=100, height=100, data=image)])
+    hand_tracker = FakeHandTracker([])
+    gaze_tracker = FakeGazeTracker(GazeEstimate(x=0.5, y=0.5, confidence=0.75))
+    renderer = FingerOverlayRenderer(cv2_module=cv2)
+    runner = DebugPreviewRunner(
+        AirScreenConfig(debug_preview=True, gaze_enabled=True),
+        frame_source=frame_source,
+        hand_tracker=hand_tracker,
+        gaze_tracker=gaze_tracker,
+        renderer=renderer,
+        cv2_module=cv2,
+    )
+
+    result = runner.run()
+
+    assert result == 0
+    assert "GAZE 0.75" in cv2.text
+    assert gaze_tracker.closed is True
