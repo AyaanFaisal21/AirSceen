@@ -7,7 +7,7 @@ from airscreen.gestures import PinchState
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import GazeEstimate
-from airscreen.vision.preview import DebugPreviewRunner, FingerOverlayRenderer
+from airscreen.vision.preview import DebugPreviewRunner, FingerOverlayRenderer, VisualEffectsOverlay
 
 
 class FakeCv2:
@@ -166,6 +166,38 @@ def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
 
     assert cv2.circles[0][1] == (25, 150)
     assert "GAZE 0.50" in cv2.text
+
+
+def test_visual_effects_draws_fading_fingertip_trails_across_frames() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    effects = VisualEffectsOverlay(cv2_module=cv2)
+
+    effects.render(frame, [sample_hand()], None)
+    effects.render(frame, [sample_hand()], None)
+
+    assert len(cv2.circles) == 15
+    assert len(cv2.lines) == 5
+    assert cv2.circles[0][1] == (20, 60)
+    assert cv2.circles[-1][2] == 7
+
+
+def test_visual_effects_spawns_pinch_particles_on_click_entry() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    effects = VisualEffectsOverlay(cv2_module=cv2)
+
+    effects.render(
+        frame,
+        [sample_hand()],
+        PinchState(is_pinching=True, distance=0.02, clicked=True),
+    )
+
+    assert len(cv2.circles) == 5 + VisualEffectsOverlay.PARTICLE_COUNT
+    assert len(cv2.lines) == VisualEffectsOverlay.PARTICLE_COUNT
+    assert cv2.lines[0][1] == (40, 100)
 
 
 def test_debug_preview_runner_shows_frame_and_closes_resources() -> None:
