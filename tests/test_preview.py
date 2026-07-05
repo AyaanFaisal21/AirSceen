@@ -168,19 +168,46 @@ def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
     assert "GAZE 0.50" in cv2.text
 
 
-def test_visual_effects_draws_fading_fingertip_trails_across_frames() -> None:
+def test_visual_effects_does_not_draw_trails_without_a_held_pinch() -> None:
     cv2 = FakeCv2()
     image = object()
     frame = Frame(width=100, height=200, data=image)
     effects = VisualEffectsOverlay(cv2_module=cv2)
 
     effects.render(frame, [sample_hand()], None)
+
+    assert cv2.circles == []
+    assert cv2.lines == []
+
+
+def test_visual_effects_draws_fading_index_trail_while_pinch_is_held() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    effects = VisualEffectsOverlay(cv2_module=cv2)
+
+    held_pinch = PinchState(is_pinching=True, distance=0.02, clicked=False)
+
+    effects.render(frame, [sample_hand()], held_pinch)
+    effects.render(frame, [sample_hand()], held_pinch)
+
+    assert len(cv2.circles) == 3
+    assert len(cv2.lines) == 1
+    assert cv2.circles[0][1] == (40, 100)
+    assert cv2.circles[-1][2] == 7
+
+
+def test_visual_effects_clears_index_trail_after_pinch_release() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    effects = VisualEffectsOverlay(cv2_module=cv2)
+
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=False))
     effects.render(frame, [sample_hand()], None)
 
-    assert len(cv2.circles) == 15
-    assert len(cv2.lines) == 5
-    assert cv2.circles[0][1] == (20, 60)
-    assert cv2.circles[-1][2] == 7
+    assert len(cv2.circles) == 1
+    assert cv2.lines == []
 
 
 def test_visual_effects_spawns_pinch_particles_on_click_entry() -> None:
@@ -195,7 +222,7 @@ def test_visual_effects_spawns_pinch_particles_on_click_entry() -> None:
         PinchState(is_pinching=True, distance=0.02, clicked=True),
     )
 
-    assert len(cv2.circles) == 5 + VisualEffectsOverlay.PARTICLE_COUNT
+    assert len(cv2.circles) == 1 + VisualEffectsOverlay.PARTICLE_COUNT
     assert len(cv2.lines) == VisualEffectsOverlay.PARTICLE_COUNT
     assert cv2.lines[0][1] == (40, 100)
 
