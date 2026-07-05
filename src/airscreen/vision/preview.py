@@ -32,6 +32,8 @@ class PreviewCv2Like(Protocol):
 
     def cvtColor(self, image: object, code: int) -> object: ...
 
+    def flip(self, image: object, flip_code: int) -> object: ...
+
     def rectangle(
         self,
         image: object,
@@ -111,7 +113,8 @@ def finger_markers(hand: HandLandmarks) -> Sequence[FingerMarker]:
 
 
 def to_pixel(frame: Frame, landmark: Landmark) -> Point:
-    x = min(max(int(landmark.x * frame.width), 0), frame.width - 1)
+    mirrored_x = 1.0 - landmark.x
+    x = min(max(int(mirrored_x * frame.width), 0), frame.width - 1)
     y = min(max(int(landmark.y * frame.height), 0), frame.height - 1)
     return x, y
 
@@ -391,8 +394,13 @@ class DebugPreviewRunner:
                 hands = hand_tracker.track(frame)
                 gaze_estimate = gaze_tracker.estimate(frame) if gaze_tracker is not None else None
                 pinch_state = pinch_detector.update(hands[0]) if hands else None
-                effects.render(frame, hands, pinch_state)
-                image = renderer.render(frame, hands, pinch_state, gaze_estimate)
+                display_frame = Frame(
+                    width=frame.width,
+                    height=frame.height,
+                    data=cv2.flip(frame.data, 1),
+                )
+                effects.render(display_frame, hands, pinch_state)
+                image = renderer.render(display_frame, hands, pinch_state, gaze_estimate)
                 cv2.imshow(self.WINDOW_NAME, image)
 
                 key = cv2.waitKey(1) & 0xFF
