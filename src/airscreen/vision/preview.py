@@ -94,6 +94,12 @@ class PinchParticle:
     age: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class TrailPoint:
+    point: Point
+    age: int = 0
+
+
 def finger_markers(hand: HandLandmarks) -> Sequence[FingerMarker]:
     markers = [
         FingerMarker("THUMB", hand.thumb_tip, (0, 128, 255)),
@@ -125,14 +131,15 @@ def fade_color(color: Color, strength: float) -> Color:
 
 
 class VisualEffectsOverlay:
-    TRAIL_LENGTH = 18
+    TRAIL_LENGTH = 32
+    TRAIL_POINT_LIFETIME = 24
     PARTICLE_COUNT = 12
     PARTICLE_LIFETIME = 14
     PARTICLE_DISTANCE = 54
 
     def __init__(self, cv2_module: PreviewCv2Like | None = None) -> None:
         self._cv2_module = cv2_module
-        self._index_trail: deque[Point] = deque(maxlen=self.TRAIL_LENGTH)
+        self._index_trail: deque[TrailPoint] = deque(maxlen=self.TRAIL_LENGTH)
         self._particles: list[PinchParticle] = []
 
     def render(
@@ -144,7 +151,7 @@ class VisualEffectsOverlay:
         cv2 = self._load_cv2()
         image = frame.data
 
-        self._update_index_trail(frame, hands, pinch_state)
+        self._update_index_trail(frame, hands)
         self._draw_index_trail(cv2, image)
 
         if pinch_state is not None and pinch_state.clicked and hands:
@@ -157,23 +164,41 @@ class VisualEffectsOverlay:
         self,
         frame: Frame,
         hands: Sequence[HandLandmarks],
-        pinch_state: PinchState | None,
     ) -> None:
-        if pinch_state is None or not pinch_state.is_pinching or not hands:
-            self._index_trail.clear()
-            return
+        self._age_index_trail()
 
-        self._index_trail.append(to_pixel(frame, hands[0].index_tip))
+        if hands:
+            self._index_trail.append(TrailPoint(to_pixel(frame, hands[0].index_tip)))
+
+    def _age_index_trail(self) -> None:
+        self._index_trail = deque(
+            (
+                TrailPoint(point=trail_point.point, age=trail_point.age + 1)
+                for trail_point in self._index_trail
+                if trail_point.age + 1 < self.TRAIL_POINT_LIFETIME
+            ),
+            maxlen=self.TRAIL_LENGTH,
+        )
 
     def _draw_index_trail(self, cv2: PreviewCv2Like, image: object) -> None:
-        points = list(self._index_trail)
-        for index, point in enumerate(points):
-            strength = (index + 1) / len(points)
+        trail_points = list(self._index_trail)
+        for index, trail_point in enumerate(trail_points):
+            order_strength = (index + 1) / len(trail_points)
+            age_strength = 1.0 - (trail_point.age / self.TRAIL_POINT_LIFETIME)
+            strength = order_strength * age_strength
             radius = max(2, int(7 * strength))
-            cv2.circle(image, point, radius, fade_color((80, 255, 180), strength), -1)
+            cv2.circle(
+                image,
+                trail_point.point,
+                radius,
+                fade_color((80, 255, 180), strength),
+                -1,
+            )
 
-        for start, end in zip(points, points[1:]):
-            cv2.line(image, start, end, (60, 180, 255), 2)
+        for start, end in zip(trail_points, trail_points[1:]):
+            line_age = max(start.age, end.age)
+            strength = 1.0 - (line_age / self.TRAIL_POINT_LIFETIME)
+            cv2.line(image, start.point, end.point, fade_color((60, 180, 255), strength), 2)
 
     def _spawn_pinch_burst(self, frame: Frame, landmark: Landmark) -> None:
         origin = to_pixel(frame, landmark)
