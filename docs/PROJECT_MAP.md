@@ -2,7 +2,7 @@
 
 ## Vision
 
-AirScreen turns webcam landmarks into desktop intent. The first usable prototype should let a user move the pointer with their index finger and click by pinching index finger and thumb together. Gaze tracking is a secondary signal for target selection and correction, not a dependency for the first hand-control milestone.
+AirScreen turns webcam landmarks into desktop intent. The first usable prototype should let a user move the pointer with their index finger and click by pinching middle finger and thumb together. Gaze tracking is a secondary signal for target selection and correction, not a dependency for the first hand-control milestone.
 
 ## Runtime Data Flow
 
@@ -26,7 +26,7 @@ AirScreen turns webcam landmarks into desktop intent. The first usable prototype
 ## Interaction Model
 
 - Move: index fingertip controls the pointer after calibration and smoothing.
-- Click: index-thumb pinch emits one click on gesture entry, then waits for release.
+- Click: middle-thumb pinch emits one click on gesture entry, then waits for release.
 - Hold: future extension where a sustained pinch becomes drag.
 - Gaze Assist: future extension where gaze picks the likely target and hand motion confirms.
 

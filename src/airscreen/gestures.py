@@ -14,7 +14,7 @@ class PinchState:
 
 
 class PinchClickDetector:
-    """Stateful hysteresis detector for index-thumb click gestures."""
+    """Stateful hysteresis detector for middle-thumb click gestures."""
 
     def __init__(self, click_threshold: float, release_threshold: float) -> None:
         if click_threshold <= 0:
@@ -27,7 +27,10 @@ class PinchClickDetector:
         self._pinching = False
 
     def update(self, hand: HandLandmarks) -> PinchState:
-        pinch_distance = normalized_distance(hand.index_tip, hand.thumb_tip)
+        if hand.middle_tip is None:
+            raise ValueError("middle_tip is required for middle-thumb pinch detection")
+
+        pinch_distance = normalized_distance(hand.middle_tip, hand.thumb_tip)
         clicked = False
 
         if not self._pinching and pinch_distance <= self._click_threshold:

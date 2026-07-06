@@ -10,7 +10,8 @@ def hand_with_pinch_distance(distance: float) -> HandLandmarks:
     return HandLandmarks(
         wrist=Landmark(0.0, 0.0),
         thumb_tip=Landmark(0.0, 0.0),
-        index_tip=Landmark(distance, 0.0),
+        index_tip=Landmark(0.5, 0.0),
+        middle_tip=Landmark(distance, 0.0),
     )
 
 
@@ -36,6 +37,34 @@ def test_pinch_detector_uses_release_hysteresis() -> None:
 
     assert state.is_pinching is True
     assert state.clicked is False
+
+
+def test_pinch_detector_ignores_index_thumb_distance() -> None:
+    detector = PinchClickDetector(click_threshold=0.05, release_threshold=0.08)
+    hand = HandLandmarks(
+        wrist=Landmark(0.0, 0.0),
+        thumb_tip=Landmark(0.0, 0.0),
+        index_tip=Landmark(0.01, 0.0),
+        middle_tip=Landmark(0.5, 0.0),
+    )
+
+    state = detector.update(hand)
+
+    assert state.clicked is False
+    assert state.is_pinching is False
+    assert state.distance == 0.5
+
+
+def test_pinch_detector_requires_middle_finger_landmark() -> None:
+    detector = PinchClickDetector(click_threshold=0.05, release_threshold=0.08)
+    hand = HandLandmarks(
+        wrist=Landmark(0.0, 0.0),
+        thumb_tip=Landmark(0.0, 0.0),
+        index_tip=Landmark(0.01, 0.0),
+    )
+
+    with pytest.raises(ValueError, match="middle_tip is required"):
+        detector.update(hand)
 
 
 def test_pinch_detector_rejects_invalid_thresholds() -> None:

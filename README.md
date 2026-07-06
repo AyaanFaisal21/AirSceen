@@ -8,7 +8,7 @@ The current repository is an initial project scaffold. It separates camera captu
 
 - Track fingertip position from webcam hand landmarks.
 - Move the desktop pointer from a smoothed index-finger target.
-- Detect a learned index-thumb pinch gesture for click intent.
+- Detect a learned middle-thumb pinch gesture for click intent.
 - Add experimental eye tracking for gaze-assisted pointer targeting.
 - Support calibration profiles so tracking can adapt to a user, camera, and screen.
 
