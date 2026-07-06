@@ -131,8 +131,9 @@ def fade_color(color: Color, strength: float) -> Color:
 
 
 class VisualEffectsOverlay:
-    TRAIL_LENGTH = 32
-    TRAIL_POINT_LIFETIME = 24
+    TRAIL_COLOR = (0, 0, 255)
+    TRAIL_LENGTH = 64
+    TRAIL_POINT_LIFETIME = 48
     PARTICLE_COUNT = 12
     PARTICLE_LIFETIME = 14
     PARTICLE_DISTANCE = 54
@@ -141,6 +142,7 @@ class VisualEffectsOverlay:
         self._cv2_module = cv2_module
         self._index_trail: deque[TrailPoint] = deque(maxlen=self.TRAIL_LENGTH)
         self._particles: list[PinchParticle] = []
+        self._trail_enabled = False
 
     def render(
         self,
@@ -150,6 +152,9 @@ class VisualEffectsOverlay:
     ) -> None:
         cv2 = self._load_cv2()
         image = frame.data
+
+        if pinch_state is not None and pinch_state.clicked:
+            self._trail_enabled = not self._trail_enabled
 
         self._update_index_trail(frame, hands)
         self._draw_index_trail(cv2, image)
@@ -167,7 +172,7 @@ class VisualEffectsOverlay:
     ) -> None:
         self._age_index_trail()
 
-        if hands:
+        if self._trail_enabled and hands:
             self._index_trail.append(TrailPoint(to_pixel(frame, hands[0].index_tip)))
 
     def _age_index_trail(self) -> None:
@@ -191,14 +196,14 @@ class VisualEffectsOverlay:
                 image,
                 trail_point.point,
                 radius,
-                fade_color((80, 255, 180), strength),
+                fade_color(self.TRAIL_COLOR, strength),
                 -1,
             )
 
         for start, end in zip(trail_points, trail_points[1:]):
             line_age = max(start.age, end.age)
             strength = 1.0 - (line_age / self.TRAIL_POINT_LIFETIME)
-            cv2.line(image, start.point, end.point, fade_color((60, 180, 255), strength), 2)
+            cv2.line(image, start.point, end.point, fade_color(self.TRAIL_COLOR, strength), 2)
 
     def _spawn_pinch_burst(self, frame: Frame, landmark: Landmark) -> None:
         origin = to_pixel(frame, landmark)

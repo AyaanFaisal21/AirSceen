@@ -171,7 +171,7 @@ def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
     assert "GAZE 0.50" in cv2.text
 
 
-def test_visual_effects_draws_index_trail_without_a_held_pinch() -> None:
+def test_visual_effects_does_not_draw_index_trail_before_toggle_pinch() -> None:
     cv2 = FakeCv2()
     image = object()
     frame = Frame(width=100, height=200, data=image)
@@ -179,24 +179,39 @@ def test_visual_effects_draws_index_trail_without_a_held_pinch() -> None:
 
     effects.render(frame, [sample_hand()], None)
 
-    assert len(cv2.circles) == 1
-    assert cv2.circles[0][1] == (60, 100)
+    assert cv2.circles == []
     assert cv2.lines == []
 
 
-def test_visual_effects_draws_fading_index_trail_across_frames() -> None:
+def test_visual_effects_toggles_red_index_trail_on_with_pinch_click() -> None:
     cv2 = FakeCv2()
     image = object()
     frame = Frame(width=100, height=200, data=image)
     effects = VisualEffectsOverlay(cv2_module=cv2)
 
-    effects.render(frame, [sample_hand()], None)
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=True))
     effects.render(frame, [sample_hand()], None)
 
-    assert len(cv2.circles) == 3
-    assert len(cv2.lines) == 1
+    assert len(cv2.circles) == 3 + (2 * VisualEffectsOverlay.PARTICLE_COUNT)
+    assert len(cv2.lines) == 1 + (2 * VisualEffectsOverlay.PARTICLE_COUNT)
     assert cv2.circles[0][1] == (60, 100)
-    assert cv2.circles[-1][2] == 7
+    assert cv2.circles[0][3] == VisualEffectsOverlay.TRAIL_COLOR
+    assert cv2.circles[14][2] == 7
+
+
+def test_visual_effects_toggles_index_trail_off_with_second_pinch_click() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=200, data=image)
+    effects = VisualEffectsOverlay(cv2_module=cv2)
+
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=True))
+    cv2.circles.clear()
+    cv2.lines.clear()
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=True))
+
+    assert len(cv2.circles) == 1 + (2 * VisualEffectsOverlay.PARTICLE_COUNT)
+    assert cv2.circles[0][3] == (0, 0, 249)
 
 
 def test_visual_effects_keeps_fading_index_trail_when_tracking_drops() -> None:
@@ -205,14 +220,15 @@ def test_visual_effects_keeps_fading_index_trail_when_tracking_drops() -> None:
     frame = Frame(width=100, height=200, data=image)
     effects = VisualEffectsOverlay(cv2_module=cv2)
 
-    effects.render(frame, [sample_hand()], None)
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=True))
     cv2.circles.clear()
+    cv2.lines.clear()
 
     effects.render(frame, [], None)
 
-    assert len(cv2.circles) == 1
-    assert cv2.circles[0][3] == (76, 244, 172)
-    assert cv2.lines == []
+    assert len(cv2.circles) == VisualEffectsOverlay.PARTICLE_COUNT + 1
+    assert cv2.circles[0][3] == (0, 0, 249)
+    assert len(cv2.lines) == VisualEffectsOverlay.PARTICLE_COUNT
 
 
 def test_visual_effects_expires_index_trail_after_tracking_stays_lost() -> None:
@@ -221,12 +237,12 @@ def test_visual_effects_expires_index_trail_after_tracking_stays_lost() -> None:
     frame = Frame(width=100, height=200, data=image)
     effects = VisualEffectsOverlay(cv2_module=cv2)
 
-    effects.render(frame, [sample_hand()], None)
+    effects.render(frame, [sample_hand()], PinchState(is_pinching=True, distance=0.02, clicked=True))
     for _ in range(VisualEffectsOverlay.TRAIL_POINT_LIFETIME):
         cv2.circles.clear()
         effects.render(frame, [], None)
 
-    assert cv2.circles == []
+    assert len(cv2.circles) <= VisualEffectsOverlay.PARTICLE_COUNT
 
 
 def test_visual_effects_spawns_pinch_particles_on_click_entry() -> None:
