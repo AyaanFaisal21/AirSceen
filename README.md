@@ -56,6 +56,14 @@ airscreen --debug-preview --enable-gaze
 
 This draws an approximate gaze marker from MediaPipe Face Mesh/iris landmarks. It is useful for early visual validation, but it is not calibrated screen gaze yet.
 
+To capture landmark samples for later calibration or regression tests, record a short JSON Lines session from the debug preview:
+
+```bash
+airscreen --debug-preview --enable-gaze --record-landmarks captures/session.jsonl
+```
+
+Each line contains one frame sample with frame dimensions, hand landmarks, and the optional gaze estimate. Runtime captures are ignored by git by default.
+
 ## Planned Runtime Stack
 
 - Python 3.11+

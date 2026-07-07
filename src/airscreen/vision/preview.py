@@ -3,13 +3,15 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass
+from importlib import import_module
 from math import cos, pi, sin
 from typing import Protocol, cast
 
 from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchClickDetector, PinchState
 from airscreen.landmarks import HandLandmarks, Landmark
-from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource
+from airscreen.recording import LandmarkSessionRecorder
+from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource, VideoCaptureLike
 from airscreen.vision.gaze_tracker import GazeEstimate, GazeTracker, MediaPipeGazeTracker
 from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
 
@@ -28,7 +30,7 @@ class PreviewCv2Like(Protocol):
     @property
     def LINE_AA(self) -> int: ...
 
-    def VideoCapture(self, camera_index: int) -> object: ...
+    def VideoCapture(self, camera_index: int) -> VideoCaptureLike: ...
 
     def cvtColor(self, image: object, code: int) -> object: ...
 
@@ -80,6 +82,18 @@ class PreviewCv2Like(Protocol):
     def destroyAllWindows(self) -> None: ...
 
 
+class LandmarkRecorder(Protocol):
+    def record(
+        self,
+        frame_index: int,
+        frame: Frame,
+        hands: Sequence[HandLandmarks],
+        gaze_estimate: GazeEstimate | None = None,
+    ) -> None: ...
+
+    def close(self) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class FingerMarker:
     label: str
@@ -127,7 +141,11 @@ def to_pixel(frame: Frame, landmark: Landmark) -> Point:
 
 def fade_color(color: Color, strength: float) -> Color:
     clamped = min(max(strength, 0.0), 1.0)
-    return tuple(int(channel * clamped) for channel in color)
+    return (
+        int(color[0] * clamped),
+        int(color[1] * clamped),
+        int(color[2] * clamped),
+    )
 
 
 class VisualEffectsOverlay:
@@ -239,7 +257,7 @@ class VisualEffectsOverlay:
             return self._cv2_module
 
         try:
-            import cv2  # type: ignore[import-not-found]
+            cv2 = import_module("cv2")
         except ImportError as exc:
             raise RuntimeError(
                 "OpenCV is not installed. Install the vision extras with "
@@ -371,7 +389,7 @@ class FingerOverlayRenderer:
             return self._cv2_module
 
         try:
-            import cv2  # type: ignore[import-not-found]
+            cv2 = import_module("cv2")
         except ImportError as exc:
             raise RuntimeError(
                 "OpenCV is not installed. Install the vision extras with "
@@ -394,6 +412,7 @@ class DebugPreviewRunner:
         gaze_tracker: GazeTracker | None = None,
         renderer: FingerOverlayRenderer | None = None,
         effects: VisualEffectsOverlay | None = None,
+        recorder: LandmarkRecorder | None = None,
         cv2_module: PreviewCv2Like | None = None,
     ) -> None:
         self._config = config
@@ -402,6 +421,7 @@ class DebugPreviewRunner:
         self._gaze_tracker = gaze_tracker
         self._renderer = renderer
         self._effects = effects
+        self._recorder = recorder
         self._cv2_module = cv2_module
 
     def run(self) -> int:
@@ -414,15 +434,19 @@ class DebugPreviewRunner:
         gaze_tracker = self._load_gaze_tracker(cv2)
         renderer = self._renderer or FingerOverlayRenderer(cv2_module=cv2)
         effects = self._effects or VisualEffectsOverlay(cv2_module=cv2)
+        recorder = self._load_recorder()
         pinch_detector = PinchClickDetector(
             click_threshold=self._config.pinch_click_threshold,
             release_threshold=self._config.pinch_release_threshold,
         )
 
         try:
-            for frame in frame_source.frames():
+            for frame_index, frame in enumerate(frame_source.frames()):
                 hands = hand_tracker.track(frame)
                 gaze_estimate = gaze_tracker.estimate(frame) if gaze_tracker is not None else None
+                if recorder is not None:
+                    recorder.record(frame_index, frame, hands, gaze_estimate)
+
                 pinch_state = pinch_detector.update(hands[0]) if hands else None
                 display_frame = Frame(
                     width=frame.width,
@@ -443,6 +467,8 @@ class DebugPreviewRunner:
             close = getattr(gaze_tracker, "close", None)
             if callable(close):
                 close()
+            if recorder is not None:
+                recorder.close()
             cv2.destroyAllWindows()
 
         return 0
@@ -453,12 +479,21 @@ class DebugPreviewRunner:
 
         return self._gaze_tracker or MediaPipeGazeTracker(cv2_module=cv2)
 
+    def _load_recorder(self) -> LandmarkRecorder | None:
+        if self._recorder is not None:
+            return self._recorder
+
+        if self._config.landmark_record_path is None:
+            return None
+
+        return LandmarkSessionRecorder(self._config.landmark_record_path)
+
     def _load_cv2(self) -> PreviewCv2Like:
         if self._cv2_module is not None:
             return self._cv2_module
 
         try:
-            import cv2  # type: ignore[import-not-found]
+            cv2 = import_module("cv2")
         except ImportError as exc:
             raise RuntimeError(
                 "OpenCV is not installed. Install the vision extras with "

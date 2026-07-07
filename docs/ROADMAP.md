@@ -13,7 +13,7 @@
 - [x] Add OpenCV camera frame source.
 - [x] Add MediaPipe hand tracker adapter.
 - [x] Add debug preview with landmark overlay.
-- [ ] Record short landmark sessions for testing and calibration.
+- [x] Record short landmark sessions for testing and calibration.
 
 ## Phase 2: Pointer Movement
 

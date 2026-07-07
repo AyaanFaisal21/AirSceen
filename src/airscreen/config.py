@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,3 +14,4 @@ class AirScreenConfig:
     pointer_smoothing: float = 0.35
     pointer_enabled: bool = False
     gaze_enabled: bool = False
+    landmark_record_path: Path | None = None

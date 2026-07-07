@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Protocol, cast
 
 
@@ -67,7 +68,7 @@ class OpenCVCameraSource:
             return self._cv2_module
 
         try:
-            import cv2  # type: ignore[import-not-found]
+            cv2 = import_module("cv2")
         except ImportError as exc:
             raise RuntimeError(
                 "OpenCV is not installed. Install the vision extras with "

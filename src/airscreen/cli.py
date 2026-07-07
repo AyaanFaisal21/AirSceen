@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from airscreen.app import AirScreenApp
 from airscreen.config import AirScreenConfig
@@ -32,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Add approximate gaze tracking to the debug preview.",
     )
+    parser.add_argument(
+        "--record-landmarks",
+        type=Path,
+        metavar="PATH",
+        help="Write debug-preview hand and gaze landmarks to a JSON Lines file.",
+    )
     return parser
 
 
@@ -42,5 +49,6 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
         debug_preview=args.debug_preview,
         gaze_enabled=args.enable_gaze,
+        landmark_record_path=args.record_landmarks,
     )
     return AirScreenApp(config).run()

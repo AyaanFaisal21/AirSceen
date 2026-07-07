@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol, cast
+from importlib import import_module
+from typing import Any, Protocol, cast
 
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame
@@ -79,7 +80,7 @@ class MediaPipeHandTracker:
     def _load_hands(self) -> MediaPipeHandsLike:
         if self._hands is None:
             try:
-                import mediapipe as mp  # type: ignore[import-not-found]
+                mp = cast(Any, import_module("mediapipe"))
             except ImportError as exc:
                 raise RuntimeError(
                     "MediaPipe is not installed. Install the vision extras with "
@@ -103,7 +104,7 @@ class MediaPipeHandTracker:
             return self._cv2_module
 
         try:
-            import cv2  # type: ignore[import-not-found]
+            cv2 = import_module("cv2")
         except ImportError as exc:
             raise RuntimeError(
                 "OpenCV is not installed. Install the vision extras with "

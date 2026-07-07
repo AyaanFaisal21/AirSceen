@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import MediaPipeGazeTracker
 
@@ -71,8 +73,8 @@ def test_mediapipe_gaze_tracker_estimates_from_iris_landmarks() -> None:
     assert cv2.convert_code == FakeCv2.COLOR_BGR2RGB
     assert face_mesh.processed_image is cv2.rgb_image
     assert estimate is not None
-    assert estimate.x == 0.4
-    assert estimate.y == 0.6
+    assert estimate.x == pytest.approx(0.4)
+    assert estimate.y == pytest.approx(0.6)
     assert estimate.confidence == 0.75
 
 

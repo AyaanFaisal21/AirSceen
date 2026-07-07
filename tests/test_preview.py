@@ -121,6 +121,24 @@ class FakeGazeTracker:
         self.closed = True
 
 
+class FakeRecorder:
+    def __init__(self) -> None:
+        self.records: list[tuple[int, Frame, Sequence[HandLandmarks], GazeEstimate | None]] = []
+        self.closed = False
+
+    def record(
+        self,
+        frame_index: int,
+        frame: Frame,
+        hands: Sequence[HandLandmarks],
+        gaze_estimate: GazeEstimate | None = None,
+    ) -> None:
+        self.records.append((frame_index, frame, hands, gaze_estimate))
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def sample_hand() -> HandLandmarks:
     return HandLandmarks(
         wrist=Landmark(0.1, 0.1),
@@ -305,3 +323,31 @@ def test_debug_preview_runner_uses_gaze_tracker_when_enabled() -> None:
     assert result == 0
     assert "GAZE 0.75" in cv2.text
     assert gaze_tracker.closed is True
+
+
+def test_debug_preview_runner_records_landmark_frames() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=100, data=image)
+    frame_source = FakeFrameSource([frame])
+    hand = sample_hand()
+    hand_tracker = FakeHandTracker([hand])
+    gaze_estimate = GazeEstimate(x=0.5, y=0.5, confidence=0.75)
+    gaze_tracker = FakeGazeTracker(gaze_estimate)
+    recorder = FakeRecorder()
+    renderer = FingerOverlayRenderer(cv2_module=cv2)
+    runner = DebugPreviewRunner(
+        AirScreenConfig(debug_preview=True, gaze_enabled=True),
+        frame_source=frame_source,
+        hand_tracker=hand_tracker,
+        gaze_tracker=gaze_tracker,
+        recorder=recorder,
+        renderer=renderer,
+        cv2_module=cv2,
+    )
+
+    result = runner.run()
+
+    assert result == 0
+    assert recorder.records == [(0, frame, [hand], gaze_estimate)]
+    assert recorder.closed is True
