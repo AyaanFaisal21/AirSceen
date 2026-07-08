@@ -32,7 +32,8 @@
 ## Phase 4: Gaze Assist
 
 - [x] Add MediaPipe face mesh based gaze estimation.
-- [ ] Calibrate gaze to the screen with guided points.
+- [x] Add guided target set and reusable gaze calibration profile mapping.
+- [ ] Add guided calibration capture UI.
 - [ ] Combine gaze and hand input for target disambiguation.
 - [ ] Keep gaze optional until accuracy is useful.
 

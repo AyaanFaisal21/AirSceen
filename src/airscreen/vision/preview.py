@@ -9,6 +9,7 @@ from typing import Protocol, cast
 
 from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchClickDetector, PinchState
+from airscreen.gaze_calibration import GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.recording import LandmarkSessionRecorder
 from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource, VideoCaptureLike
@@ -435,6 +436,7 @@ class DebugPreviewRunner:
         renderer = self._renderer or FingerOverlayRenderer(cv2_module=cv2)
         effects = self._effects or VisualEffectsOverlay(cv2_module=cv2)
         recorder = self._load_recorder()
+        gaze_profile = self._load_gaze_profile()
         pinch_detector = PinchClickDetector(
             click_threshold=self._config.pinch_click_threshold,
             release_threshold=self._config.pinch_release_threshold,
@@ -444,6 +446,9 @@ class DebugPreviewRunner:
             for frame_index, frame in enumerate(frame_source.frames()):
                 hands = hand_tracker.track(frame)
                 gaze_estimate = gaze_tracker.estimate(frame) if gaze_tracker is not None else None
+                if gaze_estimate is not None and gaze_profile is not None:
+                    gaze_estimate = gaze_profile.apply(gaze_estimate)
+
                 if recorder is not None:
                     recorder.record(frame_index, frame, hands, gaze_estimate)
 
@@ -487,6 +492,12 @@ class DebugPreviewRunner:
             return None
 
         return LandmarkSessionRecorder(self._config.landmark_record_path)
+
+    def _load_gaze_profile(self) -> GazeCalibrationProfile | None:
+        if self._config.gaze_calibration_profile_path is None:
+            return None
+
+        return GazeCalibrationProfile.load(self._config.gaze_calibration_profile_path)
 
     def _load_cv2(self) -> PreviewCv2Like:
         if self._cv2_module is not None:

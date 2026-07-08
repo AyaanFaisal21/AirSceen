@@ -15,3 +15,4 @@ class AirScreenConfig:
     pointer_enabled: bool = False
     gaze_enabled: bool = False
     landmark_record_path: Path | None = None
+    gaze_calibration_profile_path: Path | None = None

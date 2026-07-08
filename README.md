@@ -56,6 +56,14 @@ airscreen --debug-preview --enable-gaze
 
 This draws an approximate gaze marker from MediaPipe Face Mesh/iris landmarks. It is useful for early visual validation, but it is not calibrated screen gaze yet.
 
+Saved gaze calibration profiles can be applied to the debug preview:
+
+```bash
+airscreen --debug-preview --enable-gaze --gaze-profile .airscreen/gaze-profile.json
+```
+
+The current calibration layer fits a simple normalized X/Y correction from guided target samples. It is the deterministic profile format and mapping step; a full guided capture UI is still planned.
+
 To capture landmark samples for later calibration or regression tests, record a short JSON Lines session from the debug preview:
 
 ```bash

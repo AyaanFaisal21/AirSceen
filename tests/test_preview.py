@@ -4,6 +4,7 @@ from collections.abc import Iterator, Sequence
 
 from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchState
+from airscreen.gaze_calibration import AxisCalibration, GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import GazeEstimate
@@ -351,3 +352,34 @@ def test_debug_preview_runner_records_landmark_frames() -> None:
     assert result == 0
     assert recorder.records == [(0, frame, [hand], gaze_estimate)]
     assert recorder.closed is True
+
+
+def test_debug_preview_runner_applies_gaze_calibration_profile(tmp_path) -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame_source = FakeFrameSource([Frame(width=100, height=100, data=image)])
+    hand_tracker = FakeHandTracker([])
+    gaze_tracker = FakeGazeTracker(GazeEstimate(x=0.25, y=0.75, confidence=0.75))
+    profile_path = tmp_path / "gaze-profile.json"
+    GazeCalibrationProfile(
+        x_axis=AxisCalibration(scale=2.0, offset=0.0),
+        y_axis=AxisCalibration(scale=0.5, offset=0.0),
+    ).save(profile_path)
+    renderer = FingerOverlayRenderer(cv2_module=cv2)
+    runner = DebugPreviewRunner(
+        AirScreenConfig(
+            debug_preview=True,
+            gaze_enabled=True,
+            gaze_calibration_profile_path=profile_path,
+        ),
+        frame_source=frame_source,
+        hand_tracker=hand_tracker,
+        gaze_tracker=gaze_tracker,
+        renderer=renderer,
+        cv2_module=cv2,
+    )
+
+    result = runner.run()
+
+    assert result == 0
+    assert cv2.circles[0][1] == (50, 37)

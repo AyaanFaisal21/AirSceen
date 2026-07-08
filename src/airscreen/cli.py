@@ -39,6 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Write debug-preview hand and gaze landmarks to a JSON Lines file.",
     )
+    parser.add_argument(
+        "--gaze-profile",
+        type=Path,
+        metavar="PATH",
+        help="Apply a saved gaze calibration profile to debug-preview gaze estimates.",
+    )
     return parser
 
 
@@ -50,5 +56,6 @@ def main(argv: list[str] | None = None) -> int:
         debug_preview=args.debug_preview,
         gaze_enabled=args.enable_gaze,
         landmark_record_path=args.record_landmarks,
+        gaze_calibration_profile_path=args.gaze_profile,
     )
     return AirScreenApp(config).run()
