@@ -6,6 +6,7 @@ from airscreen.config import AirScreenConfig
 from airscreen.gestures import PinchState
 from airscreen.gaze_calibration import AxisCalibration, GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
+from airscreen.red_circles import RedCircleTargetSpawner
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import GazeEstimate
 from airscreen.vision.preview import (
@@ -147,10 +148,24 @@ class FakeRecorder:
 
 class FakeRedCircleOverlay:
     def __init__(self) -> None:
-        self.rendered_frames: list[tuple[Frame, float]] = []
+        self.rendered_frames: list[tuple[Frame, float, Sequence[HandLandmarks], PinchState | None]] = []
 
-    def render(self, frame: Frame, now_seconds: float) -> None:
-        self.rendered_frames.append((frame, now_seconds))
+    def render(
+        self,
+        frame: Frame,
+        now_seconds: float,
+        hands: Sequence[HandLandmarks],
+        pinch_state: PinchState | None,
+    ) -> None:
+        self.rendered_frames.append((frame, now_seconds, hands, pinch_state))
+
+
+class FakeRedCircleRandom:
+    def uniform(self, a: float, b: float) -> float:
+        return a
+
+    def randint(self, a: int, b: int) -> int:
+        return a
 
 
 def sample_hand() -> HandLandmarks:
@@ -404,13 +419,42 @@ def test_red_circle_target_overlay_draws_spawned_targets() -> None:
     frame = Frame(width=100, height=100, data=image)
     overlay = RedCircleTargetOverlay(cv2_module=cv2)
 
-    overlay.render(frame, now_seconds=0.0)
-    overlay.render(frame, now_seconds=10.0)
+    overlay.render(frame, now_seconds=0.0, hands=[], pinch_state=None)
+    overlay.render(frame, now_seconds=10.0, hands=[], pinch_state=None)
 
     assert cv2.circles[-1][0] is image
     assert cv2.circles[-1][2] == 28
     assert cv2.circles[-1][3] == (0, 0, 255)
     assert cv2.circles[-1][4] == -1
+
+
+def test_red_circle_target_overlay_pops_target_on_pinch_click() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=100, data=image)
+    overlay = RedCircleTargetOverlay(
+        spawner=RedCircleTargetSpawner(random_source=FakeRedCircleRandom()),
+        cv2_module=cv2,
+    )
+    hand_on_target = HandLandmarks(
+        wrist=Landmark(0.5, 0.5),
+        thumb_tip=Landmark(0.56, 0.44),
+        index_tip=Landmark(0.56, 0.44),
+        middle_tip=Landmark(0.56, 0.44),
+    )
+
+    overlay.render(frame, now_seconds=0.0, hands=[], pinch_state=None)
+    overlay.render(frame, now_seconds=2.0, hands=[], pinch_state=None)
+    cv2.circles.clear()
+
+    overlay.render(
+        frame,
+        now_seconds=2.1,
+        hands=[hand_on_target],
+        pinch_state=PinchState(is_pinching=True, distance=0.0, clicked=True),
+    )
+
+    assert cv2.circles == []
 
 
 def test_debug_preview_runner_renders_red_circle_overlay_when_enabled() -> None:

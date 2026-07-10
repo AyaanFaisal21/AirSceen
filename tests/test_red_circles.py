@@ -51,3 +51,28 @@ def test_red_circle_spawner_keeps_targets_inside_frame_margins() -> None:
     assert targets[0].center == (44, 44)
     assert targets[0].radius == 28
     assert random_source.randint_calls == [(44, 595), (44, 435)]
+
+
+def test_red_circle_spawner_pops_hit_target() -> None:
+    spawner = RedCircleTargetSpawner(random_source=FakeRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    spawner.update(frame, now_seconds=2.0)
+
+    popped = spawner.pop_at((44, 44))
+
+    assert popped is not None
+    assert popped.center == (44, 44)
+    assert spawner.targets == ()
+
+
+def test_red_circle_spawner_keeps_targets_when_pop_misses() -> None:
+    spawner = RedCircleTargetSpawner(random_source=FakeRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    spawner.update(frame, now_seconds=2.0)
+
+    assert spawner.pop_at((200, 200)) is None
+    assert len(spawner.targets) == 1

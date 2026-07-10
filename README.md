@@ -80,7 +80,7 @@ A toggleable side-project overlay can spawn red circle targets in the debug prev
 airscreen --debug-preview --red-circle-targets
 ```
 
-Targets spawn sporadically, no faster than every two seconds, no slower than every ten seconds while the overlay is below its cap, and at most four are visible at once. Pinch-to-clear behavior is planned next.
+Targets spawn sporadically, no faster than every two seconds, no slower than every ten seconds while the overlay is below its cap, and at most four are visible at once. Pinching on a target pops it.
 
 ## Planned Runtime Stack
 

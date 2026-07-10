@@ -414,7 +414,16 @@ class RedCircleTargetOverlay:
         self._spawner = spawner or RedCircleTargetSpawner()
         self._cv2_module = cv2_module
 
-    def render(self, frame: Frame, now_seconds: float) -> None:
+    def render(
+        self,
+        frame: Frame,
+        now_seconds: float,
+        hands: Sequence[HandLandmarks],
+        pinch_state: PinchState | None,
+    ) -> None:
+        if pinch_state is not None and pinch_state.clicked and hands:
+            self._spawner.pop_at(to_pixel(frame, hands[0].index_tip))
+
         cv2 = self._load_cv2()
         for target in self._spawner.update(frame, now_seconds):
             cv2.circle(frame.data, target.center, target.radius, self.TARGET_COLOR, -1)
@@ -497,7 +506,7 @@ class DebugPreviewRunner:
                 )
                 effects.render(display_frame, hands, pinch_state)
                 if red_circle_overlay is not None:
-                    red_circle_overlay.render(display_frame, perf_counter())
+                    red_circle_overlay.render(display_frame, perf_counter(), hands, pinch_state)
 
                 image = renderer.render(display_frame, hands, pinch_state, gaze_estimate)
                 cv2.imshow(self.WINDOW_NAME, image)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from random import Random
+from math import dist
 from typing import Protocol
 
 from airscreen.vision.camera import Frame
@@ -51,6 +52,22 @@ class RedCircleTargetSpawner:
             self._schedule_next_spawn(now_seconds)
 
         return self.targets
+
+    def pop_at(self, point: Point) -> RedCircleTarget | None:
+        hit_targets = [
+            (index, target)
+            for index, target in enumerate(self._targets)
+            if dist(point, target.center) <= target.radius
+        ]
+        if not hit_targets:
+            return None
+
+        target_index, target = min(
+            hit_targets,
+            key=lambda indexed_target: dist(point, indexed_target[1].center),
+        )
+        del self._targets[target_index]
+        return target
 
     def _schedule_next_spawn(self, now_seconds: float) -> None:
         delay = self._random_source.uniform(
