@@ -8,7 +8,12 @@ from airscreen.gaze_calibration import AxisCalibration, GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import GazeEstimate
-from airscreen.vision.preview import DebugPreviewRunner, FingerOverlayRenderer, VisualEffectsOverlay
+from airscreen.vision.preview import (
+    DebugPreviewRunner,
+    FingerOverlayRenderer,
+    RedCircleTargetOverlay,
+    VisualEffectsOverlay,
+)
 
 
 class FakeCv2:
@@ -138,6 +143,14 @@ class FakeRecorder:
 
     def close(self) -> None:
         self.closed = True
+
+
+class FakeRedCircleOverlay:
+    def __init__(self) -> None:
+        self.rendered_frames: list[tuple[Frame, float]] = []
+
+    def render(self, frame: Frame, now_seconds: float) -> None:
+        self.rendered_frames.append((frame, now_seconds))
 
 
 def sample_hand() -> HandLandmarks:
@@ -383,3 +396,40 @@ def test_debug_preview_runner_applies_gaze_calibration_profile(tmp_path) -> None
 
     assert result == 0
     assert cv2.circles[0][1] == (50, 37)
+
+
+def test_red_circle_target_overlay_draws_spawned_targets() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=100, data=image)
+    overlay = RedCircleTargetOverlay(cv2_module=cv2)
+
+    overlay.render(frame, now_seconds=0.0)
+    overlay.render(frame, now_seconds=10.0)
+
+    assert cv2.circles[-1][0] is image
+    assert cv2.circles[-1][2] == 28
+    assert cv2.circles[-1][3] == (0, 0, 255)
+    assert cv2.circles[-1][4] == -1
+
+
+def test_debug_preview_runner_renders_red_circle_overlay_when_enabled() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame_source = FakeFrameSource([Frame(width=100, height=100, data=image)])
+    hand_tracker = FakeHandTracker([])
+    red_circle_overlay = FakeRedCircleOverlay()
+    renderer = FingerOverlayRenderer(cv2_module=cv2)
+    runner = DebugPreviewRunner(
+        AirScreenConfig(debug_preview=True, red_circle_targets_enabled=True),
+        frame_source=frame_source,
+        hand_tracker=hand_tracker,
+        renderer=renderer,
+        red_circle_overlay=red_circle_overlay,
+        cv2_module=cv2,
+    )
+
+    result = runner.run()
+
+    assert result == 0
+    assert len(red_circle_overlay.rendered_frames) == 1

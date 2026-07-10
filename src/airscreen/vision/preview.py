@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from math import cos, pi, sin
+from time import perf_counter
 from typing import Protocol, cast
 
 from airscreen.config import AirScreenConfig
@@ -12,6 +13,7 @@ from airscreen.gestures import PinchClickDetector, PinchState
 from airscreen.gaze_calibration import GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.recording import LandmarkSessionRecorder
+from airscreen.red_circles import RedCircleTargetSpawner
 from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource, VideoCaptureLike
 from airscreen.vision.gaze_tracker import GazeEstimate, GazeTracker, MediaPipeGazeTracker
 from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
@@ -401,6 +403,38 @@ class FingerOverlayRenderer:
         return self._cv2_module
 
 
+class RedCircleTargetOverlay:
+    TARGET_COLOR = (0, 0, 255)
+
+    def __init__(
+        self,
+        spawner: RedCircleTargetSpawner | None = None,
+        cv2_module: PreviewCv2Like | None = None,
+    ) -> None:
+        self._spawner = spawner or RedCircleTargetSpawner()
+        self._cv2_module = cv2_module
+
+    def render(self, frame: Frame, now_seconds: float) -> None:
+        cv2 = self._load_cv2()
+        for target in self._spawner.update(frame, now_seconds):
+            cv2.circle(frame.data, target.center, target.radius, self.TARGET_COLOR, -1)
+
+    def _load_cv2(self) -> PreviewCv2Like:
+        if self._cv2_module is not None:
+            return self._cv2_module
+
+        try:
+            cv2 = import_module("cv2")
+        except ImportError as exc:
+            raise RuntimeError(
+                "OpenCV is not installed. Install the vision extras with "
+                '`python -m pip install -e ".[vision]"`.'
+            ) from exc
+
+        self._cv2_module = cast(PreviewCv2Like, cv2)
+        return self._cv2_module
+
+
 class DebugPreviewRunner:
     WINDOW_NAME = "AirScreen Debug Preview"
     QUIT_KEYS = {ord("q"), 27}
@@ -413,6 +447,7 @@ class DebugPreviewRunner:
         gaze_tracker: GazeTracker | None = None,
         renderer: FingerOverlayRenderer | None = None,
         effects: VisualEffectsOverlay | None = None,
+        red_circle_overlay: RedCircleTargetOverlay | None = None,
         recorder: LandmarkRecorder | None = None,
         cv2_module: PreviewCv2Like | None = None,
     ) -> None:
@@ -422,6 +457,7 @@ class DebugPreviewRunner:
         self._gaze_tracker = gaze_tracker
         self._renderer = renderer
         self._effects = effects
+        self._red_circle_overlay = red_circle_overlay
         self._recorder = recorder
         self._cv2_module = cv2_module
 
@@ -435,6 +471,7 @@ class DebugPreviewRunner:
         gaze_tracker = self._load_gaze_tracker(cv2)
         renderer = self._renderer or FingerOverlayRenderer(cv2_module=cv2)
         effects = self._effects or VisualEffectsOverlay(cv2_module=cv2)
+        red_circle_overlay = self._load_red_circle_overlay(cv2)
         recorder = self._load_recorder()
         gaze_profile = self._load_gaze_profile()
         pinch_detector = PinchClickDetector(
@@ -459,6 +496,9 @@ class DebugPreviewRunner:
                     data=cv2.flip(frame.data, 1),
                 )
                 effects.render(display_frame, hands, pinch_state)
+                if red_circle_overlay is not None:
+                    red_circle_overlay.render(display_frame, perf_counter())
+
                 image = renderer.render(display_frame, hands, pinch_state, gaze_estimate)
                 cv2.imshow(self.WINDOW_NAME, image)
 
@@ -498,6 +538,15 @@ class DebugPreviewRunner:
             return None
 
         return GazeCalibrationProfile.load(self._config.gaze_calibration_profile_path)
+
+    def _load_red_circle_overlay(
+        self,
+        cv2: PreviewCv2Like,
+    ) -> RedCircleTargetOverlay | None:
+        if not self._config.red_circle_targets_enabled:
+            return None
+
+        return self._red_circle_overlay or RedCircleTargetOverlay(cv2_module=cv2)
 
     def _load_cv2(self) -> PreviewCv2Like:
         if self._cv2_module is not None:

@@ -16,3 +16,4 @@ class AirScreenConfig:
     gaze_enabled: bool = False
     landmark_record_path: Path | None = None
     gaze_calibration_profile_path: Path | None = None
+    red_circle_targets_enabled: bool = False

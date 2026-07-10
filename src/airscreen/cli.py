@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Apply a saved gaze calibration profile to debug-preview gaze estimates.",
     )
+    parser.add_argument(
+        "--red-circle-targets",
+        action="store_true",
+        help="Show the experimental red-circle pinch targets in the debug preview.",
+    )
     return parser
 
 
@@ -57,5 +62,6 @@ def main(argv: list[str] | None = None) -> int:
         gaze_enabled=args.enable_gaze,
         landmark_record_path=args.record_landmarks,
         gaze_calibration_profile_path=args.gaze_profile,
+        red_circle_targets_enabled=args.red_circle_targets,
     )
     return AirScreenApp(config).run()

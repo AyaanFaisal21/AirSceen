@@ -72,6 +72,16 @@ airscreen --debug-preview --enable-gaze --record-landmarks captures/session.json
 
 Each line contains one frame sample with frame dimensions, hand landmarks, and the optional gaze estimate. Runtime captures are ignored by git by default.
 
+## Red Circle Target Experiment
+
+A toggleable side-project overlay can spawn red circle targets in the debug preview:
+
+```bash
+airscreen --debug-preview --red-circle-targets
+```
+
+Targets spawn sporadically, no faster than every two seconds, no slower than every ten seconds while the overlay is below its cap, and at most four are visible at once. Pinch-to-clear behavior is planned next.
+
 ## Planned Runtime Stack
 
 - Python 3.11+
