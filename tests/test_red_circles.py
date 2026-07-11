@@ -76,3 +76,39 @@ def test_red_circle_spawner_keeps_targets_when_pop_misses() -> None:
 
     assert spawner.pop_at((200, 200)) is None
     assert len(spawner.targets) == 1
+
+
+def test_red_circle_spawner_slices_target_with_fast_crossing_motion() -> None:
+    spawner = RedCircleTargetSpawner(random_source=FakeRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    spawner.update(frame, now_seconds=2.0)
+
+    sliced = spawner.slice_between((0, 44), (90, 44), elapsed_seconds=0.1)
+
+    assert sliced is not None
+    assert sliced.center == (44, 44)
+    assert spawner.targets == ()
+
+
+def test_red_circle_spawner_does_not_slice_with_slow_motion() -> None:
+    spawner = RedCircleTargetSpawner(random_source=FakeRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    spawner.update(frame, now_seconds=2.0)
+
+    assert spawner.slice_between((0, 44), (90, 44), elapsed_seconds=1.0) is None
+    assert len(spawner.targets) == 1
+
+
+def test_red_circle_spawner_does_not_slice_by_slowly_moving_onto_target() -> None:
+    spawner = RedCircleTargetSpawner(random_source=FakeRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    spawner.update(frame, now_seconds=2.0)
+
+    assert spawner.slice_between((0, 44), (44, 44), elapsed_seconds=0.05) is None
+    assert len(spawner.targets) == 1

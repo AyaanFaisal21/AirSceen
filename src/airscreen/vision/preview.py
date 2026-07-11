@@ -13,7 +13,7 @@ from airscreen.gestures import PinchClickDetector, PinchState
 from airscreen.gaze_calibration import GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.recording import LandmarkSessionRecorder
-from airscreen.red_circles import RedCircleTargetSpawner
+from airscreen.red_circles import IndexFingerSample, RedCircleTargetSpawner
 from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource, VideoCaptureLike
 from airscreen.vision.gaze_tracker import GazeEstimate, GazeTracker, MediaPipeGazeTracker
 from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
@@ -413,6 +413,7 @@ class RedCircleTargetOverlay:
     ) -> None:
         self._spawner = spawner or RedCircleTargetSpawner()
         self._cv2_module = cv2_module
+        self._previous_index_sample: IndexFingerSample | None = None
 
     def render(
         self,
@@ -421,12 +422,24 @@ class RedCircleTargetOverlay:
         hands: Sequence[HandLandmarks],
         pinch_state: PinchState | None,
     ) -> None:
-        if pinch_state is not None and pinch_state.clicked and hands:
-            self._spawner.pop_at(to_pixel(frame, hands[0].index_tip))
+        index_point = to_pixel(frame, hands[0].index_tip) if hands else None
+        if pinch_state is not None and pinch_state.clicked and index_point is not None:
+            self._spawner.pop_at(index_point)
+
+        if index_point is not None and self._previous_index_sample is not None:
+            self._spawner.slice_between(
+                self._previous_index_sample.point,
+                index_point,
+                now_seconds - self._previous_index_sample.now_seconds,
+            )
 
         cv2 = self._load_cv2()
         for target in self._spawner.update(frame, now_seconds):
             cv2.circle(frame.data, target.center, target.radius, self.TARGET_COLOR, -1)
+
+        self._previous_index_sample = (
+            IndexFingerSample(index_point, now_seconds) if index_point is not None else None
+        )
 
     def _load_cv2(self) -> PreviewCv2Like:
         if self._cv2_module is not None:

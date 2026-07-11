@@ -457,6 +457,36 @@ def test_red_circle_target_overlay_pops_target_on_pinch_click() -> None:
     assert cv2.circles == []
 
 
+def test_red_circle_target_overlay_slices_target_with_fast_index_motion() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=100, data=image)
+    overlay = RedCircleTargetOverlay(
+        spawner=RedCircleTargetSpawner(random_source=FakeRedCircleRandom()),
+        cv2_module=cv2,
+    )
+    hand_left_of_target = HandLandmarks(
+        wrist=Landmark(0.9, 0.44),
+        thumb_tip=Landmark(0.9, 0.44),
+        index_tip=Landmark(0.9, 0.44),
+        middle_tip=Landmark(0.9, 0.44),
+    )
+    hand_right_of_target = HandLandmarks(
+        wrist=Landmark(0.0, 0.44),
+        thumb_tip=Landmark(0.0, 0.44),
+        index_tip=Landmark(0.0, 0.44),
+        middle_tip=Landmark(0.0, 0.44),
+    )
+
+    overlay.render(frame, now_seconds=0.0, hands=[hand_left_of_target], pinch_state=None)
+    overlay.render(frame, now_seconds=2.0, hands=[hand_left_of_target], pinch_state=None)
+    cv2.circles.clear()
+
+    overlay.render(frame, now_seconds=2.1, hands=[hand_right_of_target], pinch_state=None)
+
+    assert cv2.circles == []
+
+
 def test_debug_preview_runner_renders_red_circle_overlay_when_enabled() -> None:
     cv2 = FakeCv2()
     image = object()

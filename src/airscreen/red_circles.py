@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from random import Random
 from math import dist
+from random import Random
 from typing import Protocol
 
 from airscreen.vision.camera import Frame
@@ -24,12 +24,19 @@ class RedCircleTarget:
     radius: int
 
 
+@dataclass(frozen=True, slots=True)
+class IndexFingerSample:
+    point: Point
+    now_seconds: float
+
+
 class RedCircleTargetSpawner:
     MIN_SPAWN_DELAY_SECONDS = 2.0
     MAX_SPAWN_DELAY_SECONDS = 10.0
     MAX_TARGETS = 4
     TARGET_RADIUS = 28
     EDGE_PADDING = 16
+    MIN_SLICE_SPEED_PIXELS_PER_SECOND = 450.0
 
     def __init__(self, random_source: RandomLike | None = None) -> None:
         self._random_source = random_source or Random()
@@ -69,6 +76,38 @@ class RedCircleTargetSpawner:
         del self._targets[target_index]
         return target
 
+    def slice_between(
+        self,
+        start: Point,
+        end: Point,
+        elapsed_seconds: float,
+    ) -> RedCircleTarget | None:
+        if elapsed_seconds <= 0:
+            return None
+
+        speed = dist(start, end) / elapsed_seconds
+        if speed < self.MIN_SLICE_SPEED_PIXELS_PER_SECOND:
+            return None
+
+        hit_targets = [
+            (index, target)
+            for index, target in enumerate(self._targets)
+            if segment_slices_circle(start, end, target)
+        ]
+        if not hit_targets:
+            return None
+
+        target_index, target = min(
+            hit_targets,
+            key=lambda indexed_target: segment_distance_to_point(
+                start,
+                end,
+                indexed_target[1].center,
+            ),
+        )
+        del self._targets[target_index]
+        return target
+
     def _schedule_next_spawn(self, now_seconds: float) -> None:
         delay = self._random_source.uniform(
             self.MIN_SPAWN_DELAY_SECONDS,
@@ -89,3 +128,29 @@ class RedCircleTargetSpawner:
             ),
             radius=self.TARGET_RADIUS,
         )
+
+
+def segment_slices_circle(start: Point, end: Point, target: RedCircleTarget) -> bool:
+    return (
+        dist(start, target.center) > target.radius
+        and dist(end, target.center) > target.radius
+        and segment_distance_to_point(start, end, target.center) <= target.radius
+    )
+
+
+def segment_distance_to_point(start: Point, end: Point, point: Point) -> float:
+    segment_x = end[0] - start[0]
+    segment_y = end[1] - start[1]
+    length_squared = (segment_x * segment_x) + (segment_y * segment_y)
+    if length_squared == 0:
+        return dist(start, point)
+
+    projection = (
+        ((point[0] - start[0]) * segment_x) + ((point[1] - start[1]) * segment_y)
+    ) / length_squared
+    clamped_projection = min(max(projection, 0.0), 1.0)
+    closest = (
+        start[0] + (segment_x * clamped_projection),
+        start[1] + (segment_y * clamped_projection),
+    )
+    return dist(closest, point)
