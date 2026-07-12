@@ -13,7 +13,7 @@ from airscreen.gestures import PinchClickDetector, PinchState
 from airscreen.gaze_calibration import GazeCalibrationProfile
 from airscreen.landmarks import HandLandmarks, Landmark
 from airscreen.recording import LandmarkSessionRecorder
-from airscreen.red_circles import IndexFingerSample, RedCircleTargetSpawner
+from airscreen.red_circles import IndexFingerSample, RedCircleTarget, RedCircleTargetSpawner, TargetKind
 from airscreen.vision.camera import Frame, FrameSource, OpenCVCameraSource, VideoCaptureLike
 from airscreen.vision.gaze_tracker import GazeEstimate, GazeTracker, MediaPipeGazeTracker
 from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
@@ -404,7 +404,9 @@ class FingerOverlayRenderer:
 
 
 class RedCircleTargetOverlay:
-    TARGET_COLOR = (0, 0, 255)
+    GOOD_TARGET_COLOR = (0, 220, 0)
+    BAD_TARGET_COLOR = (0, 0, 255)
+    SCORE_COLOR = (255, 255, 255)
 
     def __init__(
         self,
@@ -435,10 +437,29 @@ class RedCircleTargetOverlay:
 
         cv2 = self._load_cv2()
         for target in self._spawner.update(frame, now_seconds):
-            cv2.circle(frame.data, target.center, target.radius, self.TARGET_COLOR, -1)
+            cv2.circle(frame.data, target.center, target.radius, self._target_color(target), -1)
+        self._draw_score(cv2, frame.data)
 
         self._previous_index_sample = (
             IndexFingerSample(index_point, now_seconds) if index_point is not None else None
+        )
+
+    def _target_color(self, target: RedCircleTarget) -> Color:
+        if target.kind == TargetKind.BAD:
+            return self.BAD_TARGET_COLOR
+
+        return self.GOOD_TARGET_COLOR
+
+    def _draw_score(self, cv2: PreviewCv2Like, image: object) -> None:
+        cv2.putText(
+            image,
+            f"SCORE {self._spawner.score}",
+            (12, 88),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.75,
+            self.SCORE_COLOR,
+            2,
+            cv2.LINE_AA,
         )
 
     def _load_cv2(self) -> PreviewCv2Like:

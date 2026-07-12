@@ -161,6 +161,9 @@ class FakeRedCircleOverlay:
 
 
 class FakeRedCircleRandom:
+    def random(self) -> float:
+        return 1.0
+
     def uniform(self, a: float, b: float) -> float:
         return a
 
@@ -417,15 +420,19 @@ def test_red_circle_target_overlay_draws_spawned_targets() -> None:
     cv2 = FakeCv2()
     image = object()
     frame = Frame(width=100, height=100, data=image)
-    overlay = RedCircleTargetOverlay(cv2_module=cv2)
+    overlay = RedCircleTargetOverlay(
+        spawner=RedCircleTargetSpawner(random_source=FakeRedCircleRandom()),
+        cv2_module=cv2,
+    )
 
     overlay.render(frame, now_seconds=0.0, hands=[], pinch_state=None)
     overlay.render(frame, now_seconds=10.0, hands=[], pinch_state=None)
 
     assert cv2.circles[-1][0] is image
     assert cv2.circles[-1][2] == 28
-    assert cv2.circles[-1][3] == (0, 0, 255)
+    assert cv2.circles[-1][3] == (0, 220, 0)
     assert cv2.circles[-1][4] == -1
+    assert "SCORE 0" in cv2.text
 
 
 def test_red_circle_target_overlay_pops_target_on_pinch_click() -> None:
@@ -455,6 +462,7 @@ def test_red_circle_target_overlay_pops_target_on_pinch_click() -> None:
     )
 
     assert cv2.circles == []
+    assert "SCORE 1" in cv2.text
 
 
 def test_red_circle_target_overlay_slices_target_with_fast_index_motion() -> None:
@@ -485,6 +493,7 @@ def test_red_circle_target_overlay_slices_target_with_fast_index_motion() -> Non
     overlay.render(frame, now_seconds=2.1, hands=[hand_right_of_target], pinch_state=None)
 
     assert cv2.circles == []
+    assert "SCORE 1" in cv2.text
 
 
 def test_debug_preview_runner_renders_red_circle_overlay_when_enabled() -> None:
