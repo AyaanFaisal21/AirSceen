@@ -54,7 +54,7 @@ Gaze tracking can be toggled into the same preview:
 airscreen --debug-preview --enable-gaze
 ```
 
-This draws an approximate gaze marker from MediaPipe Face Mesh/iris landmarks. It is useful for early visual validation, but it is not calibrated screen gaze yet.
+This draws an approximate blue fake cursor from MediaPipe Face Mesh/iris landmarks. It is useful for early visual validation, but it is not calibrated screen gaze yet.
 
 Saved gaze calibration profiles can be applied to the debug preview:
 

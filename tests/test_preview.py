@@ -218,6 +218,10 @@ def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
     )
 
     assert cv2.circles[0][1] == (75, 150)
+    assert cv2.circles[0][2] == 13
+    assert cv2.circles[1][2] == 9
+    assert cv2.circles[1][3] == FingerOverlayRenderer.GAZE_CURSOR_COLOR
+    assert cv2.circles[1][4] == -1
     assert "GAZE 0.50" in cv2.text
 
 

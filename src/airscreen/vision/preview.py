@@ -273,6 +273,8 @@ class VisualEffectsOverlay:
 
 class FingerOverlayRenderer:
     BOX_RADIUS = 12
+    GAZE_CURSOR_COLOR = (255, 120, 20)
+    GAZE_CURSOR_OUTLINE_COLOR = (255, 255, 255)
 
     def __init__(self, cv2_module: PreviewCv2Like | None = None) -> None:
         self._cv2_module = cv2_module
@@ -368,11 +370,11 @@ class FingerOverlayRenderer:
     ) -> None:
         center = self._to_pixel(frame, Landmark(gaze_estimate.x, gaze_estimate.y))
         x, y = center
-        color = (255, 80, 80)
+        color = self.GAZE_CURSOR_COLOR
 
-        cv2.circle(image, center, 10, color, 2)
-        cv2.line(image, (x - 18, y), (x + 18, y), color, 2)
-        cv2.line(image, (x, y - 18), (x, y + 18), color, 2)
+        cv2.circle(image, center, 13, self.GAZE_CURSOR_OUTLINE_COLOR, 2)
+        cv2.circle(image, center, 9, color, -1)
+        cv2.circle(image, (x - 3, y - 3), 3, self.GAZE_CURSOR_OUTLINE_COLOR, -1)
         cv2.putText(
             image,
             f"GAZE {gaze_estimate.confidence:.2f}",
