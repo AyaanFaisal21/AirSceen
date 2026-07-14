@@ -46,7 +46,7 @@ python -m pip install -e ".[vision,dev]"
 airscreen --debug-preview
 ```
 
-The preview opens the selected camera, draws boxes and labels around detected fingertips, and shows a pinch-state indicator. Press `q` or Escape to quit. On macOS, the terminal or app running AirScreen may need Camera permission before frames appear.
+The preview opens the selected camera, draws boxes and labels around detected fingertips, and shows a pinch-state indicator. Press `q` or Escape to quit. Use the in-preview settings button to toggle eye tracking, toggle circle gameplay, or reset the game score. On macOS, the terminal or app running AirScreen may need Camera permission before frames appear.
 
 Gaze tracking can be toggled into the same preview:
 

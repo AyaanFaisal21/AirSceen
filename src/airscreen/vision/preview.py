@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from math import cos, pi, sin
@@ -21,6 +21,7 @@ from airscreen.vision.hand_tracker import HandTracker, MediaPipeHandTracker
 
 Color = tuple[int, int, int]
 Point = tuple[int, int]
+MouseCallback = Callable[[int, int, int, int, object | None], None]
 
 
 class PreviewCv2Like(Protocol):
@@ -32,6 +33,9 @@ class PreviewCv2Like(Protocol):
 
     @property
     def LINE_AA(self) -> int: ...
+
+    @property
+    def EVENT_LBUTTONDOWN(self) -> int: ...
 
     def VideoCapture(self, camera_index: int) -> VideoCaptureLike: ...
 
@@ -78,6 +82,10 @@ class PreviewCv2Like(Protocol):
         line_type: int,
     ) -> object: ...
 
+    def namedWindow(self, window_name: str) -> None: ...
+
+    def setMouseCallback(self, window_name: str, callback: MouseCallback) -> None: ...
+
     def imshow(self, window_name: str, image: object) -> None: ...
 
     def waitKey(self, delay_ms: int) -> int: ...
@@ -115,6 +123,20 @@ class PinchParticle:
 class TrailPoint:
     point: Point
     age: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class HudButton:
+    label: str
+    top_left: Point
+    bottom_right: Point
+
+
+def point_in_button(point: Point, button: HudButton) -> bool:
+    return (
+        button.top_left[0] <= point[0] <= button.bottom_right[0]
+        and button.top_left[1] <= point[1] <= button.bottom_right[1]
+    )
 
 
 def finger_markers(hand: HandLandmarks) -> Sequence[FingerMarker]:
@@ -446,6 +468,10 @@ class RedCircleTargetOverlay:
             IndexFingerSample(index_point, now_seconds) if index_point is not None else None
         )
 
+    def reset(self) -> None:
+        self._spawner.reset()
+        self._previous_index_sample = None
+
     def _target_color(self, target: RedCircleTarget) -> Color:
         if target.kind == TargetKind.BAD:
             return self.BAD_TARGET_COLOR
@@ -480,6 +506,158 @@ class RedCircleTargetOverlay:
         return self._cv2_module
 
 
+class DebugPreviewHud:
+    PANEL_WIDTH = 320
+    BUTTON_HEIGHT = 38
+    SETTINGS_BUTTON_WIDTH = 132
+    MARGIN = 12
+    BACKGROUND_COLOR = (30, 30, 30)
+    BUTTON_COLOR = (58, 58, 58)
+    ACTIVE_COLOR = (0, 128, 255)
+    TEXT_COLOR = (255, 255, 255)
+
+    def __init__(
+        self,
+        eye_tracking_enabled: bool = False,
+        circle_gameplay_enabled: bool = False,
+        cv2_module: PreviewCv2Like | None = None,
+    ) -> None:
+        self.eye_tracking_enabled = eye_tracking_enabled
+        self.circle_gameplay_enabled = circle_gameplay_enabled
+        self._cv2_module = cv2_module
+        self._panel_open = False
+        self._reset_requested = False
+        self._settings_button: HudButton | None = None
+        self._option_buttons: list[HudButton] = []
+
+    def render(self, frame: Frame) -> None:
+        cv2 = self._load_cv2()
+        image = frame.data
+        self._settings_button = self._make_settings_button(frame)
+        self._draw_button(cv2, image, self._settings_button, self.BUTTON_COLOR)
+
+        if not self._panel_open:
+            self._option_buttons = []
+            return
+
+        self._option_buttons = self._make_option_buttons(frame)
+        panel_top_left = self._option_buttons[0].top_left
+        panel_bottom_right = self._option_buttons[-1].bottom_right
+        cv2.rectangle(image, panel_top_left, panel_bottom_right, self.BACKGROUND_COLOR, -1)
+        for button in self._option_buttons:
+            color = self.ACTIVE_COLOR if self._button_is_active(button) else self.BUTTON_COLOR
+            self._draw_button(cv2, image, button, color)
+
+    def handle_mouse_event(
+        self,
+        event: int,
+        x: int,
+        y: int,
+        flags: int,
+        param: object | None,
+    ) -> None:
+        cv2 = self._load_cv2()
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+
+        self.handle_click((x, y))
+
+    def handle_click(self, point: Point) -> None:
+        if self._settings_button is not None and point_in_button(point, self._settings_button):
+            self._panel_open = not self._panel_open
+            return
+
+        if not self._panel_open:
+            return
+
+        for button in self._option_buttons:
+            if not point_in_button(point, button):
+                continue
+
+            if button.label.endswith("EYE TRACKING"):
+                self.eye_tracking_enabled = not self.eye_tracking_enabled
+            elif button.label.endswith("CIRCLE GAMEPLAY"):
+                self.circle_gameplay_enabled = not self.circle_gameplay_enabled
+            elif button.label == "RESET":
+                self._reset_requested = True
+            return
+
+    def consume_reset_requested(self) -> bool:
+        if not self._reset_requested:
+            return False
+
+        self._reset_requested = False
+        return True
+
+    def _make_settings_button(self, frame: Frame) -> HudButton:
+        right = frame.width - self.MARGIN
+        left = max(self.MARGIN, right - self.SETTINGS_BUTTON_WIDTH)
+        top = self.MARGIN
+        return HudButton("SETTINGS", (left, top), (right, top + self.BUTTON_HEIGHT))
+
+    def _make_option_buttons(self, frame: Frame) -> list[HudButton]:
+        right = frame.width - self.MARGIN
+        left = max(self.MARGIN, right - self.PANEL_WIDTH)
+        top = self.MARGIN + self.BUTTON_HEIGHT + 8
+        labels = [
+            f"{'DEACTIVATE' if self.eye_tracking_enabled else 'ACTIVATE'} EYE TRACKING",
+            f"{'DEACTIVATE' if self.circle_gameplay_enabled else 'ACTIVATE'} CIRCLE GAMEPLAY",
+            "RESET",
+        ]
+        return [
+            HudButton(
+                label,
+                (left, top + (index * self.BUTTON_HEIGHT)),
+                (right, top + ((index + 1) * self.BUTTON_HEIGHT)),
+            )
+            for index, label in enumerate(labels)
+        ]
+
+    def _button_is_active(self, button: HudButton) -> bool:
+        if button.label.endswith("EYE TRACKING"):
+            return self.eye_tracking_enabled
+
+        if button.label.endswith("CIRCLE GAMEPLAY"):
+            return self.circle_gameplay_enabled
+
+        return False
+
+    def _draw_button(
+        self,
+        cv2: PreviewCv2Like,
+        image: object,
+        button: HudButton,
+        color: Color,
+    ) -> None:
+        cv2.rectangle(image, button.top_left, button.bottom_right, color, -1)
+        cv2.rectangle(image, button.top_left, button.bottom_right, self.TEXT_COLOR, 1)
+        cv2.putText(
+            image,
+            button.label,
+            (button.top_left[0] + 10, button.top_left[1] + 25),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.52,
+            self.TEXT_COLOR,
+            1,
+            cv2.LINE_AA,
+        )
+
+    def _load_cv2(self) -> PreviewCv2Like:
+        if self._cv2_module is not None:
+            return self._cv2_module
+
+        try:
+            cv2 = import_module("cv2")
+        except ImportError as exc:
+            raise RuntimeError(
+                "OpenCV is not installed. Install the vision extras with "
+                '`python -m pip install -e ".[vision]"`.'
+            ) from exc
+
+        self._cv2_module = cast(PreviewCv2Like, cv2)
+        return self._cv2_module
+
+
 class DebugPreviewRunner:
     WINDOW_NAME = "AirScreen Debug Preview"
     QUIT_KEYS = {ord("q"), 27}
@@ -493,6 +671,7 @@ class DebugPreviewRunner:
         renderer: FingerOverlayRenderer | None = None,
         effects: VisualEffectsOverlay | None = None,
         red_circle_overlay: RedCircleTargetOverlay | None = None,
+        hud: DebugPreviewHud | None = None,
         recorder: LandmarkRecorder | None = None,
         cv2_module: PreviewCv2Like | None = None,
     ) -> None:
@@ -503,20 +682,28 @@ class DebugPreviewRunner:
         self._renderer = renderer
         self._effects = effects
         self._red_circle_overlay = red_circle_overlay
+        self._hud = hud
         self._recorder = recorder
         self._cv2_module = cv2_module
 
     def run(self) -> int:
         cv2 = self._load_cv2()
+        cv2.namedWindow(self.WINDOW_NAME)
         frame_source = self._frame_source or OpenCVCameraSource(
             camera_index=self._config.camera_index,
             cv2_module=cv2,
         )
         hand_tracker = self._hand_tracker or MediaPipeHandTracker(cv2_module=cv2)
-        gaze_tracker = self._load_gaze_tracker(cv2)
+        gaze_tracker: GazeTracker | None = self._gaze_tracker
         renderer = self._renderer or FingerOverlayRenderer(cv2_module=cv2)
         effects = self._effects or VisualEffectsOverlay(cv2_module=cv2)
-        red_circle_overlay = self._load_red_circle_overlay(cv2)
+        red_circle_overlay = self._red_circle_overlay
+        hud = self._hud or DebugPreviewHud(
+            eye_tracking_enabled=self._config.gaze_enabled,
+            circle_gameplay_enabled=self._config.red_circle_targets_enabled,
+            cv2_module=cv2,
+        )
+        cv2.setMouseCallback(self.WINDOW_NAME, hud.handle_mouse_event)
         recorder = self._load_recorder()
         gaze_profile = self._load_gaze_profile()
         pinch_detector = PinchClickDetector(
@@ -527,7 +714,14 @@ class DebugPreviewRunner:
         try:
             for frame_index, frame in enumerate(frame_source.frames()):
                 hands = hand_tracker.track(frame)
-                gaze_estimate = gaze_tracker.estimate(frame) if gaze_tracker is not None else None
+                if hud.eye_tracking_enabled and gaze_tracker is None:
+                    gaze_tracker = self._load_gaze_tracker(cv2)
+
+                gaze_estimate = (
+                    gaze_tracker.estimate(frame)
+                    if hud.eye_tracking_enabled and gaze_tracker is not None
+                    else None
+                )
                 if gaze_estimate is not None and gaze_profile is not None:
                     gaze_estimate = gaze_profile.apply(gaze_estimate)
 
@@ -541,10 +735,17 @@ class DebugPreviewRunner:
                     data=cv2.flip(frame.data, 1),
                 )
                 effects.render(display_frame, hands, pinch_state)
-                if red_circle_overlay is not None:
+                if hud.circle_gameplay_enabled and red_circle_overlay is None:
+                    red_circle_overlay = self._load_red_circle_overlay(cv2)
+
+                if hud.consume_reset_requested() and red_circle_overlay is not None:
+                    red_circle_overlay.reset()
+
+                if hud.circle_gameplay_enabled and red_circle_overlay is not None:
                     red_circle_overlay.render(display_frame, perf_counter(), hands, pinch_state)
 
                 image = renderer.render(display_frame, hands, pinch_state, gaze_estimate)
+                hud.render(display_frame)
                 cv2.imshow(self.WINDOW_NAME, image)
 
                 key = cv2.waitKey(1) & 0xFF
@@ -564,9 +765,6 @@ class DebugPreviewRunner:
         return 0
 
     def _load_gaze_tracker(self, cv2: PreviewCv2Like) -> GazeTracker | None:
-        if not self._config.gaze_enabled:
-            return None
-
         return self._gaze_tracker or MediaPipeGazeTracker(cv2_module=cv2)
 
     def _load_recorder(self) -> LandmarkRecorder | None:
@@ -588,9 +786,6 @@ class DebugPreviewRunner:
         self,
         cv2: PreviewCv2Like,
     ) -> RedCircleTargetOverlay | None:
-        if not self._config.red_circle_targets_enabled:
-            return None
-
         return self._red_circle_overlay or RedCircleTargetOverlay(cv2_module=cv2)
 
     def _load_cv2(self) -> PreviewCv2Like:

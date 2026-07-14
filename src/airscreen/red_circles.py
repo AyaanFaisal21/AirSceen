@@ -64,6 +64,11 @@ class RedCircleTargetSpawner:
     def score(self) -> int:
         return self._score
 
+    def reset(self) -> None:
+        self._targets = []
+        self._next_spawn_at = None
+        self._score = 0
+
     def update(self, frame: Frame, now_seconds: float) -> Sequence[RedCircleTarget]:
         self._expire_bad_targets(now_seconds)
 

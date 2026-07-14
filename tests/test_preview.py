@@ -10,6 +10,7 @@ from airscreen.red_circles import RedCircleTargetSpawner
 from airscreen.vision.camera import Frame
 from airscreen.vision.gaze_tracker import GazeEstimate
 from airscreen.vision.preview import (
+    DebugPreviewHud,
     DebugPreviewRunner,
     FingerOverlayRenderer,
     RedCircleTargetOverlay,
@@ -21,12 +22,15 @@ class FakeCv2:
     COLOR_BGR2RGB = 1
     FONT_HERSHEY_SIMPLEX = 2
     LINE_AA = 3
+    EVENT_LBUTTONDOWN = 4
 
     def __init__(self) -> None:
         self.rectangles: list[tuple[object, tuple[int, int], tuple[int, int], tuple[int, int, int], int]] = []
         self.circles: list[tuple[object, tuple[int, int], int, tuple[int, int, int], int]] = []
         self.lines: list[tuple[object, tuple[int, int], tuple[int, int], tuple[int, int, int], int]] = []
         self.text: list[str] = []
+        self.named_windows: list[str] = []
+        self.mouse_callbacks: dict[str, object] = {}
         self.shown_images: list[object] = []
         self.destroyed = False
 
@@ -85,6 +89,12 @@ class FakeCv2:
     ) -> object:
         self.text.append(text)
         return image
+
+    def namedWindow(self, window_name: str) -> None:
+        self.named_windows.append(window_name)
+
+    def setMouseCallback(self, window_name: str, callback: object) -> None:
+        self.mouse_callbacks[window_name] = callback
 
     def imshow(self, window_name: str, image: object) -> None:
         self.shown_images.append(image)
@@ -149,6 +159,7 @@ class FakeRecorder:
 class FakeRedCircleOverlay:
     def __init__(self) -> None:
         self.rendered_frames: list[tuple[Frame, float, Sequence[HandLandmarks], PinchState | None]] = []
+        self.reset_count = 0
 
     def render(
         self,
@@ -158,6 +169,9 @@ class FakeRedCircleOverlay:
         pinch_state: PinchState | None,
     ) -> None:
         self.rendered_frames.append((frame, now_seconds, hands, pinch_state))
+
+    def reset(self) -> None:
+        self.reset_count += 1
 
 
 class FakeRedCircleRandom:
@@ -223,6 +237,42 @@ def test_finger_overlay_draws_gaze_marker_when_estimate_is_present() -> None:
     assert cv2.circles[1][3] == FingerOverlayRenderer.GAZE_CURSOR_COLOR
     assert cv2.circles[1][4] == -1
     assert "GAZE 0.50" in cv2.text
+
+
+def test_debug_preview_hud_draws_settings_button_and_options() -> None:
+    cv2 = FakeCv2()
+    frame = Frame(width=400, height=300, data=object())
+    hud = DebugPreviewHud(cv2_module=cv2)
+
+    hud.render(frame)
+
+    assert "SETTINGS" in cv2.text
+    assert "ACTIVATE EYE TRACKING" not in cv2.text
+
+    hud.handle_click((300, 30))
+    hud.render(frame)
+
+    assert "ACTIVATE EYE TRACKING" in cv2.text
+    assert "ACTIVATE CIRCLE GAMEPLAY" in cv2.text
+    assert "RESET" in cv2.text
+
+
+def test_debug_preview_hud_toggles_modes_and_reset() -> None:
+    cv2 = FakeCv2()
+    frame = Frame(width=400, height=300, data=object())
+    hud = DebugPreviewHud(cv2_module=cv2)
+
+    hud.render(frame)
+    hud.handle_mouse_event(FakeCv2.EVENT_LBUTTONDOWN, 300, 30, 0, None)
+    hud.render(frame)
+    hud.handle_mouse_event(FakeCv2.EVENT_LBUTTONDOWN, 120, 76, 0, None)
+    hud.handle_mouse_event(FakeCv2.EVENT_LBUTTONDOWN, 120, 114, 0, None)
+    hud.handle_mouse_event(FakeCv2.EVENT_LBUTTONDOWN, 120, 152, 0, None)
+
+    assert hud.eye_tracking_enabled is True
+    assert hud.circle_gameplay_enabled is True
+    assert hud.consume_reset_requested() is True
+    assert hud.consume_reset_requested() is False
 
 
 def test_visual_effects_does_not_draw_index_trail_before_toggle_pinch() -> None:
