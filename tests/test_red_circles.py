@@ -38,6 +38,11 @@ class BadTargetRandom(FakeRandom):
         return b
 
 
+class BonusTargetRandom(FakeRandom):
+    def random(self) -> float:
+        return 0.3
+
+
 def test_red_circle_spawner_waits_at_least_two_seconds_before_first_spawn() -> None:
     random_source = FakeRandom()
     spawner = RedCircleTargetSpawner(random_source=random_source)
@@ -167,3 +172,19 @@ def test_red_circle_spawner_deducts_score_when_bad_target_is_hit() -> None:
     assert popped is not None
     assert popped.kind == TargetKind.BAD
     assert spawner.score == -1
+
+
+def test_red_circle_spawner_adds_two_points_when_bonus_target_is_hit() -> None:
+    spawner = RedCircleTargetSpawner(random_source=BonusTargetRandom())
+    frame = Frame(width=640, height=480, data=object())
+
+    spawner.update(frame, now_seconds=0.0)
+    targets = spawner.update(frame, now_seconds=2.0)
+
+    assert targets[0].kind == TargetKind.BONUS
+
+    popped = spawner.pop_at((44, 44))
+
+    assert popped is not None
+    assert popped.kind == TargetKind.BONUS
+    assert spawner.score == 2

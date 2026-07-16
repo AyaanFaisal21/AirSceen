@@ -185,6 +185,11 @@ class FakeRedCircleRandom:
         return a
 
 
+class FakeBonusCircleRandom(FakeRedCircleRandom):
+    def random(self) -> float:
+        return 0.3
+
+
 def sample_hand() -> HandLandmarks:
     return HandLandmarks(
         wrist=Landmark(0.1, 0.1),
@@ -487,6 +492,23 @@ def test_red_circle_target_overlay_draws_spawned_targets() -> None:
     assert cv2.circles[-1][3] == (0, 220, 0)
     assert cv2.circles[-1][4] == -1
     assert "SCORE 0" in cv2.text
+
+
+def test_red_circle_target_overlay_draws_bonus_green_marker() -> None:
+    cv2 = FakeCv2()
+    image = object()
+    frame = Frame(width=100, height=100, data=image)
+    overlay = RedCircleTargetOverlay(
+        spawner=RedCircleTargetSpawner(random_source=FakeBonusCircleRandom()),
+        cv2_module=cv2,
+    )
+
+    overlay.render(frame, now_seconds=0.0, hands=[], pinch_state=None)
+    overlay.render(frame, now_seconds=2.0, hands=[], pinch_state=None)
+
+    assert cv2.circles[-2][3] == (0, 220, 0)
+    assert cv2.circles[-1][3] == RedCircleTargetOverlay.SCORE_COLOR
+    assert "+2" in cv2.text
 
 
 def test_red_circle_target_overlay_pops_target_on_pinch_click() -> None:

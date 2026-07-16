@@ -462,6 +462,8 @@ class RedCircleTargetOverlay:
         cv2 = self._load_cv2()
         for target in self._spawner.update(frame, now_seconds):
             cv2.circle(frame.data, target.center, target.radius, self._target_color(target), -1)
+            if target.kind == TargetKind.BONUS:
+                self._draw_bonus_marker(cv2, frame.data, target)
         self._draw_score(cv2, frame.data)
 
         self._previous_index_sample = (
@@ -477,6 +479,24 @@ class RedCircleTargetOverlay:
             return self.BAD_TARGET_COLOR
 
         return self.GOOD_TARGET_COLOR
+
+    def _draw_bonus_marker(
+        self,
+        cv2: PreviewCv2Like,
+        image: object,
+        target: RedCircleTarget,
+    ) -> None:
+        cv2.circle(image, target.center, max(6, target.radius - 8), self.SCORE_COLOR, 2)
+        cv2.putText(
+            image,
+            "+2",
+            (target.center[0] - 12, target.center[1] + 6),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            self.SCORE_COLOR,
+            2,
+            cv2.LINE_AA,
+        )
 
     def _draw_score(self, cv2: PreviewCv2Like, image: object) -> None:
         cv2.putText(

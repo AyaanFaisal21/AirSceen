@@ -23,6 +23,7 @@ class RandomLike(Protocol):
 
 class TargetKind(StrEnum):
     GOOD = "good"
+    BONUS = "bonus"
     BAD = "bad"
 
 
@@ -48,6 +49,7 @@ class RedCircleTargetSpawner:
     EDGE_PADDING = 16
     MIN_SLICE_SPEED_PIXELS_PER_SECOND = 450.0
     BAD_TARGET_PROBABILITY = 0.25
+    BONUS_TARGET_PROBABILITY = 0.15
     BAD_TARGET_LIFETIME_SECONDS = 5.0
 
     def __init__(self, random_source: RandomLike | None = None) -> None:
@@ -163,8 +165,12 @@ class RedCircleTargetSpawner:
         )
 
     def _new_target_kind(self) -> TargetKind:
-        if self._random_source.random() < self.BAD_TARGET_PROBABILITY:
+        roll = self._random_source.random()
+        if roll < self.BAD_TARGET_PROBABILITY:
             return TargetKind.BAD
+
+        if roll < self.BAD_TARGET_PROBABILITY + self.BONUS_TARGET_PROBABILITY:
+            return TargetKind.BONUS
 
         return TargetKind.GOOD
 
@@ -176,7 +182,12 @@ class RedCircleTargetSpawner:
         ]
 
     def _apply_score(self, target: RedCircleTarget) -> None:
-        self._score += -1 if target.kind == TargetKind.BAD else 1
+        if target.kind == TargetKind.BAD:
+            self._score -= 1
+        elif target.kind == TargetKind.BONUS:
+            self._score += 2
+        else:
+            self._score += 1
 
 
 def segment_slices_circle(start: Point, end: Point, target: RedCircleTarget) -> bool:

@@ -80,7 +80,7 @@ A toggleable side-project overlay can spawn red circle targets in the debug prev
 airscreen --debug-preview --red-circle-targets
 ```
 
-Targets spawn sporadically, no faster than every two seconds, no slower than every ten seconds while the overlay is below its cap, and at most four are visible at once. Green targets add one point when popped or sliced. Red bad targets can appear in place of green targets, expire after a few seconds, and deduct one point if hit. Slow movement onto a target does not count as a slice.
+Targets spawn sporadically, no faster than every two seconds, no slower than every ten seconds while the overlay is below its cap, and at most four are visible at once. Green targets add one point when popped or sliced, while marked green bonus targets add two. Red bad targets can appear in place of green targets, expire after a few seconds, and deduct one point if hit. Slow movement onto a target does not count as a slice.
 
 ## Planned Runtime Stack
 
